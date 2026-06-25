@@ -59,6 +59,10 @@ jobs:
 
   deploy:
     needs: build
+    # 本番公開は default ブランチ(main)からのみ。
+    # github-pages 環境は既定で main 以外からのデプロイを保護でブロックするため、
+    # feature ブランチでは deploy をスキップして build チェックのみ行う。
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
