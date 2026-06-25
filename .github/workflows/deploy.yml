@@ -35,6 +35,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Pages が未有効でも初回に自動で有効化を試みる（手動設定を不要にする）
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Build
         run: pnpm build
         env:
