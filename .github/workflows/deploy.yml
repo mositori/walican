@@ -35,6 +35,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # public リポジトリでは Actions トークンが Pages サイトを作成できるため、
+      # 初回はここで自動有効化される（Settings での手動設定が不要）。
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Build
         run: pnpm build
         env:
