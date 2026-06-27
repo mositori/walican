@@ -8,8 +8,8 @@ export function AppLayout() {
   const outlet = useOutlet();
 
   return (
-    <div className="mx-auto flex min-h-full max-w-md flex-col">
-      <main className="pt-safe pb-safe-nav flex-1 px-4">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <main className="pt-safe flex-1 px-4 pb-4">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
