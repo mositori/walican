@@ -35,6 +35,16 @@ body {
   padding-top: env(safe-area-inset-top);
 }
 
+/* ステータスバー(black-translucent)下に潜り込む分を避けるレイアウト余白。
+   非ノッチ端末では inset=0 のため従来と同じ余白になる。 */
+.pt-safe {
+  padding-top: calc(env(safe-area-inset-top) + 1rem);
+}
+/* ボトムナビ + ホームインジケータ分の下余白 */
+.pb-safe-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 6rem);
+}
+
 /* 数値入力のスピナー非表示 */
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {

@@ -9,7 +9,7 @@ export function AppLayout() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col">
-      <main className="flex-1 px-4 pb-24 pt-4">
+      <main className="pt-safe pb-safe-nav flex-1 px-4">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
