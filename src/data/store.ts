@@ -1,15 +1,5 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  onSnapshot,
-  query,
-  setDoc,
-  where,
-  writeBatch,
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../lib/firebase';
+import { isFirebaseConfigured } from '../lib/firebaseConfig';
+import { genId } from './id';
 import {
   DEFAULT_SETTINGS,
   type Expense,
@@ -21,6 +11,10 @@ import {
 // ----------------------------------------------------------------------------
 // 抽象ストア。Firebase 設定があれば Firestore、無ければ localStorage を使う。
 // どちらも購読 (subscribe) インターフェースで統一する。
+//
+// バンドル分割: Firestore 実装（firebase SDK）は ./firestoreStore に分離し、
+// 設定済みのときだけ動的 import する。未設定（localStorage モード）では
+// firebase SDK を一切ロードしないため初期バンドルが軽い。
 // ----------------------------------------------------------------------------
 
 export interface Store {
@@ -35,13 +29,6 @@ export interface Store {
   renameGroup(id: string, name: string): Promise<void>;
   // グループを削除し、属していた支出は未分類(null)へ戻す。
   deleteGroup(id: string): Promise<void>;
-}
-
-function genId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 }
 
 // ----------------------------------------------------------------------------
@@ -155,71 +142,58 @@ function createLocalStore(): Store {
 }
 
 // ----------------------------------------------------------------------------
-// Firestore 実装
+// Firestore 遅延ラッパー
+// firebase SDK を含む ./firestoreStore を動的 import で別チャンクに切り出す。
+// 実体が読み込まれるまで購読呼び出しはバッファし、解決後に本接続へ繋ぐ。
 // ----------------------------------------------------------------------------
 
-function createFirestoreStore(): Store {
-  if (!db) throw new Error('Firestore is not initialized');
-  const database = db;
-  const settingsRef = doc(database, 'settings', 'config');
-  const expensesCol = collection(database, 'expenses');
-  const groupsCol = collection(database, 'groups');
+function createLazyFirestoreStore(): Store {
+  const realStore = import('./firestoreStore').then((m) => m.createFirestoreStore());
+
+  // 購読系: 実体ロード前に unsubscribe を即返し、ロード後に本購読へ差し替える。
+  type Sub<T> = (cb: (v: T) => void) => () => void;
+  const lazySub =
+    <T>(pick: (s: Store) => Sub<T>): Sub<T> =>
+    (cb) => {
+      let unsub: (() => void) | null = null;
+      let cancelled = false;
+      realStore
+        .then((s) => {
+          if (!cancelled) unsub = pick(s)(cb);
+        })
+        .catch((err) => console.error('Firestore store load failed', err));
+      return () => {
+        cancelled = true;
+        unsub?.();
+      };
+    };
 
   return {
     mode: 'firestore',
-    subscribeExpenses(cb) {
-      return onSnapshot(expensesCol, (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Expense);
-        cb(list);
-      });
-    },
+    subscribeExpenses: lazySub((s) => s.subscribeExpenses.bind(s)),
+    subscribeSettings: lazySub((s) => s.subscribeSettings.bind(s)),
+    subscribeGroups: lazySub((s) => s.subscribeGroups.bind(s)),
     async addExpense(input) {
-      const id = genId();
-      // Firestore は undefined を受け付けないため null に正規化する。
-      await setDoc(doc(expensesCol, id), {
-        ...input,
-        groupId: input.groupId ?? null,
-        id,
-        createdAt: Date.now(),
-      });
+      return (await realStore).addExpense(input);
     },
     async deleteExpense(id) {
-      await deleteDoc(doc(expensesCol, id));
-    },
-    subscribeSettings(cb) {
-      return onSnapshot(settingsRef, (snap) => {
-        const data = (snap.data() as Partial<Settings> | undefined) ?? {};
-        cb({ ...DEFAULT_SETTINGS, ...data });
-      });
+      return (await realStore).deleteExpense(id);
     },
     async updateSettings(settings) {
-      await setDoc(settingsRef, settings, { merge: true });
-    },
-    subscribeGroups(cb) {
-      return onSnapshot(groupsCol, (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Group);
-        cb(list);
-      });
+      return (await realStore).updateSettings(settings);
     },
     async addGroup(name) {
-      const id = genId();
-      await setDoc(doc(groupsCol, id), { id, name, createdAt: Date.now() });
-      return id;
+      return (await realStore).addGroup(name);
     },
     async renameGroup(id, name) {
-      await setDoc(doc(groupsCol, id), { name }, { merge: true });
+      return (await realStore).renameGroup(id, name);
     },
     async deleteGroup(id) {
-      // 属する支出を未分類(null)へ戻してからグループを削除（バッチで一括）。
-      const affected = await getDocs(query(expensesCol, where('groupId', '==', id)));
-      const batch = writeBatch(database);
-      affected.forEach((d) => batch.update(d.ref, { groupId: null }));
-      batch.delete(doc(groupsCol, id));
-      await batch.commit();
+      return (await realStore).deleteGroup(id);
     },
   };
 }
 
 export const store: Store = isFirebaseConfigured
-  ? createFirestoreStore()
+  ? createLazyFirestoreStore()
   : createLocalStore();
