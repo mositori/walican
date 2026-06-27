@@ -17,21 +17,30 @@ import { formatYen, summarizeBalance, totalAmount } from '../lib/money';
 
 type Unit = 'month' | 'week';
 
+// グループ絞り込み: 'all'=すべて / 'none'=未分類 / それ以外=グループid
+type GroupFilter = 'all' | 'none' | string;
+
 export function History() {
-  const { expenses, nameOf, deleteExpense } = useData();
+  const { expenses, nameOf, deleteExpense, groups } = useData();
   const [unit, setUnit] = useState<Unit>('month');
   // 表示中の期間内に含まれる基準日（前後移動で更新）
   const [anchor, setAnchor] = useState<string>(todayISO());
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
 
   const period: Period = useMemo(() => {
     const d = new Date(anchor);
     return unit === 'month' ? monthPeriod(d) : weekPeriod(d);
   }, [anchor, unit]);
 
-  const items = useMemo(
-    () => sortByNewest(filterByPeriod(expenses, period)),
-    [expenses, period],
-  );
+  const items = useMemo(() => {
+    const byPeriod = filterByPeriod(expenses, period);
+    const byGroup = byPeriod.filter((e) => {
+      if (groupFilter === 'all') return true;
+      if (groupFilter === 'none') return !e.groupId;
+      return e.groupId === groupFilter;
+    });
+    return sortByNewest(byGroup);
+  }, [expenses, period, groupFilter]);
   const balance = useMemo(() => summarizeBalance(items), [items]);
 
   const move = (dir: -1 | 1) => {
@@ -47,6 +56,28 @@ export function History() {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-bold text-slate-100">履歴</h1>
+
+      {/* グループ絞り込み */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <FilterChip
+          label="すべて"
+          active={groupFilter === 'all'}
+          onClick={() => setGroupFilter('all')}
+        />
+        <FilterChip
+          label="未分類"
+          active={groupFilter === 'none'}
+          onClick={() => setGroupFilter('none')}
+        />
+        {groups.map((g) => (
+          <FilterChip
+            key={g.id}
+            label={g.name}
+            active={groupFilter === g.id}
+            onClick={() => setGroupFilter(g.id)}
+          />
+        ))}
+      </div>
 
       {/* 月 / 週 タブ */}
       <div className="relative flex rounded-xl bg-slate-800 p-1">
@@ -103,6 +134,29 @@ export function History() {
         </ul>
       )}
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.94 }}
+      onClick={onClick}
+      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
+        active ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+      }`}
+    >
+      {label}
+    </motion.button>
   );
 }
 

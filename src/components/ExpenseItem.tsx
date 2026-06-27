@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import type { Expense, Person } from '../data/types';
 import { formatYen, shareOfNonPayer } from '../lib/money';
+import { useData } from '../context/DataContext';
+import { groupColorClass } from '../lib/groupColor';
 
 interface Props {
   expense: Expense;
@@ -9,9 +11,11 @@ interface Props {
 }
 
 export function ExpenseItem({ expense, nameOf, onDelete }: Props) {
+  const { groupName } = useData();
   const share = shareOfNonPayer(expense);
   const payerName = nameOf(expense.payer);
   const otherName = nameOf(expense.payer === 'A' ? 'B' : 'A');
+  const gName = groupName(expense.groupId);
 
   return (
     <motion.li
@@ -27,9 +31,18 @@ export function ExpenseItem({ expense, nameOf, onDelete }: Props) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-slate-100">
-          {expense.description || '（用途なし）'}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-medium text-slate-100">
+            {expense.description || '（用途なし）'}
+          </p>
+          {gName && expense.groupId && (
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${groupColorClass(expense.groupId)}`}
+            >
+              {gName}
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-xs text-slate-400">
           {expense.date.slice(5).replace('-', '/')} ・ {payerName}が立替 ・ {otherName}の負担{' '}
           {formatYen(share)}

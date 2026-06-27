@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useData } from '../context/DataContext';
 import { clearAuth } from '../lib/auth';
+import { groupColorClass } from '../lib/groupColor';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -79,6 +80,8 @@ export function Settings() {
         {saved ? '保存しました ✓' : '保存する'}
       </motion.button>
 
+      <GroupManager />
+
       <section className="rounded-2xl bg-slate-800/60 p-4">
         <h2 className="text-sm font-semibold text-slate-300">データ保存先</h2>
         <p className="mt-2 text-sm text-slate-400">
@@ -107,6 +110,151 @@ export function Settings() {
         ログアウト
       </button>
     </div>
+  );
+}
+
+function GroupManager() {
+  const { groups, addGroup, renameGroup, deleteGroup } = useData();
+  const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    await addGroup(name);
+    setNewName('');
+  };
+
+  const saveRename = async (id: string) => {
+    const name = editName.trim();
+    if (name) await renameGroup(id, name);
+    setEditingId(null);
+  };
+
+  return (
+    <section className="rounded-2xl bg-slate-800/60 p-4">
+      <h2 className="text-sm font-semibold text-slate-300">グループ</h2>
+      <p className="mt-1 text-xs text-slate-500">
+        旅行などの単位で割り勘をまとめられます。削除しても支出は未分類に残ります。
+      </p>
+
+      <ul className="mt-3 space-y-2">
+        <AnimatePresence initial={false}>
+          {groups.map((g) => (
+            <motion.li
+              key={g.id}
+              layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              className="rounded-xl bg-slate-900/50 p-2.5"
+            >
+              {editingId === g.id ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveRename(g.id)}
+                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white"
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(null)}
+                    className="px-2 text-sm text-slate-400"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : confirmId === g.id ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-slate-300">「{g.name}」を削除？</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deleteGroup(g.id);
+                        setConfirmId(null);
+                      }}
+                      className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white"
+                    >
+                      削除
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmId(null)}
+                      className="px-2 text-sm text-slate-400"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${groupColorClass(g.id)}`}
+                  >
+                    {g.name}
+                  </span>
+                  <div className="flex gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(g.id);
+                        setEditName(g.name);
+                      }}
+                      className="text-indigo-400"
+                    >
+                      名前変更
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmId(g.id)}
+                      className="text-rose-400"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+
+      <div className="mt-3 flex gap-2">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void create();
+            }
+          }}
+          placeholder="新しいグループ名"
+          className="flex-1 rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"
+        />
+        <button
+          type="button"
+          onClick={() => void create()}
+          disabled={!newName.trim()}
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+        >
+          追加
+        </button>
+      </div>
+    </section>
   );
 }
 
