@@ -10,6 +10,11 @@ body,
   height: 100%;
 }
 
+/* PWA(standalone)で実ビューポート高に追従させる */
+#root {
+  min-height: 100dvh;
+}
+
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
@@ -40,10 +45,6 @@ body {
 .pt-safe {
   padding-top: calc(env(safe-area-inset-top) + 1rem);
 }
-/* ボトムナビ + ホームインジケータ分の下余白 */
-.pb-safe-nav {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 6rem);
-}
 
 /* 数値入力のスピナー非表示 */
 input[type='number']::-webkit-outer-spin-button,
@@ -53,4 +54,15 @@ input[type='number']::-webkit-inner-spin-button {
 }
 input[type='number'] {
   -moz-appearance: textfield;
+}
+
+/* iOS の date 入力は固有の最小幅で画面外にはみ出すため抑制する */
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
 }
