@@ -11,6 +11,7 @@ import {
   DEFAULT_SETTINGS,
   type Expense,
   type ExpenseInput,
+  type Group,
   type Person,
   type Settings,
 } from '../data/types';
@@ -18,12 +19,17 @@ import {
 interface DataContextValue {
   expenses: Expense[];
   settings: Settings;
+  groups: Group[];
   loading: boolean;
   mode: 'firestore' | 'local';
   addExpense: (input: ExpenseInput) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
+  addGroup: (name: string) => Promise<string>;
+  renameGroup: (id: string, name: string) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
   nameOf: (p: Person) => string;
+  groupName: (id: string | null | undefined) => string | null;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -31,8 +37,10 @@ const DataContext = createContext<DataContextValue | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loadedExpenses, setLoadedExpenses] = useState(false);
   const [loadedSettings, setLoadedSettings] = useState(false);
+  const [loadedGroups, setLoadedGroups] = useState(false);
 
   useEffect(() => {
     const unsubExpenses = store.subscribeExpenses((list) => {
@@ -43,9 +51,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setSettings(s);
       setLoadedSettings(true);
     });
+    const unsubGroups = store.subscribeGroups((list) => {
+      setGroups(list);
+      setLoadedGroups(true);
+    });
     return () => {
       unsubExpenses();
       unsubSettings();
+      unsubGroups();
     };
   }, []);
 
@@ -53,14 +66,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => ({
       expenses,
       settings,
-      loading: !loadedExpenses || !loadedSettings,
+      groups,
+      loading: !loadedExpenses || !loadedSettings || !loadedGroups,
       mode: store.mode,
       addExpense: store.addExpense.bind(store),
       deleteExpense: store.deleteExpense.bind(store),
       updateSettings: store.updateSettings.bind(store),
+      addGroup: store.addGroup.bind(store),
+      renameGroup: store.renameGroup.bind(store),
+      deleteGroup: store.deleteGroup.bind(store),
       nameOf: (p) => (p === 'A' ? settings.nameA : settings.nameB),
+      groupName: (id) => {
+        if (!id) return null;
+        return groups.find((g) => g.id === id)?.name ?? null;
+      },
     }),
-    [expenses, settings, loadedExpenses, loadedSettings],
+    [expenses, settings, groups, loadedExpenses, loadedSettings, loadedGroups],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -8,7 +8,7 @@ import { formatYen } from '../lib/money';
 
 export function AddExpense() {
   const navigate = useNavigate();
-  const { settings, addExpense, nameOf } = useData();
+  const { settings, addExpense, nameOf, groups, addGroup } = useData();
 
   const [payer, setPayer] = useState<Person>('A');
   const [amount, setAmount] = useState('');
@@ -16,7 +16,19 @@ export function AddExpense() {
   const [date, setDate] = useState(todayISO());
   // ratioA をスライダーで持ち、ratioB = 100 - ratioA とする。
   const [ratioA, setRatioA] = useState(settings.defaultRatioA);
+  const [groupId, setGroupId] = useState<string | null>(null); // null = 未分類
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const createGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    const id = await addGroup(name);
+    setGroupId(id);
+    setNewGroupName('');
+    setCreatingGroup(false);
+  };
 
   const ratioB = 100 - ratioA;
   const amountNum = Number(amount) || 0;
@@ -40,6 +52,7 @@ export function AddExpense() {
       ratioA,
       ratioB,
       date,
+      groupId,
     });
     navigate('/');
   };
@@ -100,6 +113,70 @@ export function AddExpense() {
           placeholder="例: ランチ、スーパー、映画"
           className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 outline-none focus:border-indigo-500"
         />
+      </Field>
+
+      {/* グループ */}
+      <Field label="グループ">
+        <div className="flex flex-wrap gap-2">
+          <GroupChip
+            label="未分類"
+            active={groupId === null}
+            onClick={() => setGroupId(null)}
+          />
+          {groups.map((g) => (
+            <GroupChip
+              key={g.id}
+              label={g.name}
+              active={groupId === g.id}
+              onClick={() => setGroupId(g.id)}
+            />
+          ))}
+          {!creatingGroup && (
+            <button
+              type="button"
+              onClick={() => setCreatingGroup(true)}
+              className="rounded-full border border-dashed border-slate-600 px-3 py-1.5 text-sm text-slate-400 active:bg-slate-800"
+            >
+              ＋新規
+            </button>
+          )}
+        </div>
+        {creatingGroup && (
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              autoFocus
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void createGroup();
+                }
+              }}
+              placeholder="例: 沖縄旅行"
+              className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={() => void createGroup()}
+              disabled={!newGroupName.trim()}
+              className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              追加
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingGroup(false);
+                setNewGroupName('');
+              }}
+              className="rounded-xl px-2 py-2 text-sm text-slate-400"
+            >
+              取消
+            </button>
+          </div>
+        )}
       </Field>
 
       {/* 日付 */}
@@ -168,5 +245,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="mb-1.5 block text-xs font-medium text-slate-400">{label}</label>
       {children}
     </div>
+  );
+}
+
+function GroupChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.94 }}
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+        active
+          ? 'bg-indigo-600 text-white'
+          : 'bg-slate-800 text-slate-300 active:bg-slate-700'
+      }`}
+    >
+      {label}
+    </motion.button>
   );
 }
